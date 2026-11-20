@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Dashboard demo IoT untuk histori sensor, agregasi, dan peringatan lingkungan.">
+    <title>Enviro Monitor · Dashboard IoT</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <a class="brand" href="#ringkasan">
+                <span class="brand-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span>Enviro<span class="brand-accent">Monitor</span></span>
+            </a>
+            <nav aria-label="Navigasi dashboard">
+                <a href="#ringkasan">Ringkasan</a>
+                <a href="#histori">Histori</a>
+                <a href="#peringatan">Peringatan</a>
+            </nav>
+            <span id="api-status" class="api-status" data-state="idle">
+                <span class="status-dot"></span><span id="api-text">Memeriksa API</span>
+            </span>
+        </div>
+    </header>
+    <main id="ringkasan">
+        <section class="page-head" aria-labelledby="page-title">
+            <div>
+                <h1 id="page-title">Monitoring lingkungan</h1>
+                <p>Pantau pembacaan sensor dan perubahan status perangkat.</p>
+            </div>
+            <button id="open-token" class="button secondary" type="button">Hubungkan token</button>
+        </section>
+
+        <section class="device-banner" aria-label="Perangkat yang dipantau">
+            <div class="device-icon" aria-hidden="true"><span></span></div>
+            <div class="device-details">
+                <strong id="device-name">Belum ada perangkat demo</strong>
+                <div id="device-location">Siapkan perangkat dari kontrol demo.</div>
+            </div>
+            <div class="device-status">
+                <span id="connectivity" class="badge neutral">Belum terdaftar</span>
+                <span id="last-seen"></span>
+            </div>
+        </section>
+        <p id="notice" class="notice" role="status" hidden></p>
+
+        <section class="metrics" aria-label="Pembacaan terbaru">
+            <article class="metric-card co2">
+                <div class="metric-heading">
+                    <span class="metric-symbol" aria-hidden="true">CO₂</span><h2>Karbon dioksida</h2>
+                </div>
+                <p class="measurement"><strong id="value-co2">—</strong> <span>ppm</span></p>
+                <p class="metric-threshold">Alert aktif <strong id="threshold-co2"></strong></p>
+            </article>
+            <article class="metric-card temperature">
+                <div class="metric-heading">
+                    <span class="metric-symbol" aria-hidden="true">°C</span><h2>Suhu</h2>
+                </div>
+                <p class="measurement"><strong id="value-temperature">—</strong> <span>°C</span></p>
+                <p class="metric-threshold">Alert aktif <strong id="threshold-temperature"></strong></p>
+            </article>
+            <article class="metric-card humidity">
+                <div class="metric-heading">
+                    <span class="metric-symbol" aria-hidden="true">%</span><h2>Kelembapan</h2>
+                </div>
+                <p class="measurement"><strong id="value-humidity">—</strong> <span>% RH</span></p>
+                <p class="metric-threshold">Alert aktif <strong id="threshold-humidity"></strong></p>
+            </article>
+        </section>
+
+        <div class="dashboard-grid">
+            <div class="main-column">
+                <section class="panel chart-panel" aria-labelledby="chart-title">
+                    <div class="panel-head chart-head">
+                        <div><h2 id="chart-title">Tren sensor</h2><p>Pembacaan tersimpan dalam 24 jam terakhir</p></div>
+                        <div class="segmented" aria-label="Metrik grafik">
+                            <button type="button" aria-pressed="true" data-metric="co2">CO₂</button>
+                            <button type="button" aria-pressed="false" data-metric="temperature">Suhu</button>
+                            <button type="button" aria-pressed="false" data-metric="humidity">Kelembapan</button>
+                        </div>
+                    </div>
+                    <div class="chart">
+                        <canvas id="chart" role="img" aria-label="Grafik pembacaan CO₂"></canvas>
+                        <p id="chart-empty">Belum ada pembacaan tersimpan.</p>
+                    </div>
+                    <div class="chart-legend"><span><i class="legend-line"></i>Pengukuran</span><span><i class="legend-threshold"></i>Ambang alert</span></div>
+                </section>
+
+                <section id="histori" class="panel" aria-labelledby="history-title">
+                    <div class="panel-head">
+                        <div><h2 id="history-title">Histori &amp; agregasi</h2><p>Waktu lokal browser</p></div>
+                        <label class="visually-hidden" for="history-mode">Tampilan histori</label>
+                        <select id="history-mode">
+                            <option value="readings">Pembacaan</option>
+                            <option value="minute">Per menit</option>
+                            <option value="hour">Per jam</option>
+                        </select>
+                    </div>
+                    <div class="table-wrap">
+                        <table><thead id="history-head"></thead><tbody id="history-body"></tbody></table>
+                    </div>
+                </section>
+            </div>
+
+            <div class="side-column">
+                <section class="panel controls" aria-labelledby="control-title">
+                    <div class="panel-head">
+                        <div><h2 id="control-title">Kontrol demo</h2><p>Profil ruang kerja kantor menurut Permenkes 48/2016</p></div>
+                    </div>
+                    <form id="setup-form">
+                        <label for="demo-name">Nama perangkat</label>
+                        <input id="demo-name" maxlength="100" required value="Lab Lingkungan">
+                        <button id="setup" class="button primary" type="submit">Siapkan perangkat demo</button>
+                    </form>
+                    <div id="demo-actions" class="demo-actions" hidden>
+                        <button id="heartbeat" class="button secondary" type="button">Kirim heartbeat</button>
+                        <button id="high" class="button primary" type="button">Kirim pembacaan tinggi</button>
+                        <button id="replay" class="button secondary" type="button">Ulangi event terakhir</button>
+                        <button id="recover" class="button secondary" type="button">Kirim pembacaan pemulihan</button>
+                    </div>
+                    <div class="event-panel">
+                        <div class="event-heading"><h3>Event terakhir</h3><span id="event-result" class="badge neutral">Belum dikirim</span></div>
+                        <p id="event-text">Status antrean dan histori akan tampil di sini.</p>
+                        <code id="event-id" hidden></code>
+                    </div>
+                </section>
+
+                <section id="peringatan" class="panel" aria-labelledby="alert-title">
+                    <div class="panel-head">
+                        <div><h2 id="alert-title">Peringatan</h2><p>Alert terbaru per sensor</p></div>
+                        <button id="refresh" type="button" class="button secondary small">Segarkan</button>
+                    </div>
+                    <ul id="alerts" class="alert-list">
+                        <li class="empty-alert">Belum ada peringatan.</li>
+                    </ul>
+                </section>
+            </div>
+        </div>
+    </main>
+    <dialog id="token-dialog" aria-labelledby="token-title">
+        <form id="token-form">
+            <h2 id="token-title">Token operator</h2>
+            <p>Masukkan <code>ADMIN_TOKEN</code> dari file <code>.env</code>. Token disimpan di memori halaman selama demo.</p>
+            <label for="token">ADMIN_TOKEN</label>
+            <input id="token" type="password" required autocomplete="off" spellcheck="false">
+            <p id="token-error" class="field-error" role="alert" hidden></p>
+            <div class="dialog-actions">
+                <button id="token-cancel" type="button" class="button secondary">Batal</button>
+                <button id="token-connect" type="submit" class="button primary">Hubungkan</button>
+            </div>
+        </form>
+    </dialog>
+</body>
+</html>
