@@ -1,0 +1,91 @@
+x-backend-environment: &backend-environment
+  DATABASE_URL: postgres://${POSTGRES_USER:-iot_user}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-iot_monitor}?sslmode=disable
+  REDIS_URL: redis://redis:6379/0
+  REDIS_STREAM: "${REDIS_STREAM:-iot:readings}"
+  REDIS_GROUP: "${REDIS_GROUP:-iot-workers}"
+  QUEUE_LIMIT: "${QUEUE_LIMIT:-10000}"
+  WORKER_COUNT: "${WORKER_COUNT:-4}"
+  WORKER_BATCH_SIZE: "${WORKER_BATCH_SIZE:-32}"
+  CLAIM_IDLE: "${CLAIM_IDLE:-30s}"
+  PROCESS_TIMEOUT: "${PROCESS_TIMEOUT:-10s}"
+  OFFLINE_TIMEOUT: "${OFFLINE_TIMEOUT:-5m}"
+  MONITOR_INTERVAL: "${MONITOR_INTERVAL:-15s}"
+
+x-backend: &backend
+  image: "${BACKEND_IMAGE:-iot-environment-monitoring:local}"
+  build:
+    context: .
+    target: runtime
+  restart: unless-stopped
+  stop_grace_period: 15s
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
+
+services:
+  postgres:
+    image: timescale/timescaledb:2.32.1-pg17
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb", "-c", "timescaledb.telemetry_level=off"]
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-iot_user}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB:-iot_monitor}"
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  migrate:
+    image: migrate/migrate:v4.19.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations:ro
+    command: ["-path", "/migrations", "-database", "postgres://${POSTGRES_USER:-iot_user}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-iot_monitor}?sslmode=disable", "up"]
+
+  api:
+    <<: *backend
+    environment:
+      <<: *backend-environment
+      ADMIN_TOKEN: "${ADMIN_TOKEN:?set ADMIN_TOKEN}"
+      GIN_MODE: release
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  worker:
+    <<: *backend
+    environment: *backend-environment
+    command: ["/app/worker"]
+
+volumes:
+  timescale-data:
+  redis-data:
+
