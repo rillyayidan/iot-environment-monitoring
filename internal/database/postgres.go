@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,7 +16,7 @@ func NewPostgres(
 
 	cfg, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("Parse database config: %w", err)
+		return nil, errors.New("invalid DATABASE_URL")
 	}
 
 	cfg.MaxConns = 10
@@ -24,7 +25,7 @@ func NewPostgres(
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("Create connection pool: %w", err)
+		return nil, fmt.Errorf("create connection pool: %w", err)
 	}
 
 	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -32,7 +33,7 @@ func NewPostgres(
 
 	if err := pool.Ping(pingCtx); err != nil {
 		pool.Close()
-		return nil, fmt.Errorf("Connect to PostgreSQL: %w", err)
+		return nil, fmt.Errorf("connect to PostgreSQL: %w", err)
 	}
 
 	return pool, nil
