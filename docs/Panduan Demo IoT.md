@@ -17,6 +17,12 @@ if (-not (Test-Path -LiteralPath '.env')) {
 }
 ```
 
+Jika .env masih kosong, jalankan perintah berikut untuk membuat dua nilai terpisah. Isi baris pertama sebagai POSTGRES_PASSWORD dan kedua sebagai ADMIN_TOKEN, lalu jalankan Compose.
+```powershell
+1..2 | ForEach-Object {
+    [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+}
+```
 `POSTGRES_PASSWORD` adalah password database. `ADMIN_TOKEN` adalah token operator untuk mengelola perangkat dan membaca data API. Saat perangkat didaftarkan, backend membuat `X-API-Key` khusus untuk perangkat itu.
 
 Supaya transisi offline bisa diperagakan dalam waktu singkat, gunakan timeout 30 detik dan interval monitoring 3 detik di terminal demo. Dua variabel ini berlaku di sesi terminal. Timeout bawaan dari `.env.example` adalah 5 menit, dan monitoring bawaan berjalan setiap 15 detik.
